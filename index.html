@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Workday Wave Clock - Minute Marker Edition</title>
+    <title>Workday Wave Clock - Fixed Timeline</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;900&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
 
@@ -12,11 +12,20 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Pretendard', sans-serif; background-color: var(--bg-color); height: 100vh; width: 100vw; display: flex; justify-content: center; align-items: center; overflow: hidden; }
 
-        /* --- 상단 타임라인 --- */
-        .timeline-container { position: fixed; top: 0; left: 0; width: 100vw; height: 30px; padding: 0 10px; z-index: 20; pointer-events: none; }
+        /* --- 상단 타임라인 (수정됨) --- */
+        .timeline-container { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100vw; 
+            height: 40px; 
+            /* 양 옆에 여백을 주어 글자가 잘리지 않게 보호합니다 */
+            padding: 0 30px; 
+            z-index: 20; 
+            pointer-events: none; 
+        }
         .timeline-inner { position: relative; width: 100%; height: 100%; }
         
-        /* [추가] 하얀 삼각형 분 표시기 */
         #minute-marker {
             position: absolute;
             top: 0;
@@ -24,16 +33,26 @@
             height: 0;
             border-left: 8px solid transparent;
             border-right: 8px solid transparent;
-            border-top: 12px solid #ffffff; /* 하얀 삼각형 */
+            border-top: 12px solid #ffffff;
             transform: translateX(-50%);
             z-index: 25;
-            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3)); /* 그림자로 시인성 확보 */
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));
             transition: left 0.5s ease-out;
         }
 
-        .time-mark { position: absolute; top: 12px; transform: translateX(-50%); font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 600; color: var(--text-color); opacity: 0.35; white-space: nowrap; transition: all 0.3s ease; }
-        .time-mark:first-child { transform: translateX(0); }
-        .time-mark:last-child { transform: translateX(-100%); }
+        .time-mark { 
+            position: absolute; 
+            top: 15px; 
+            transform: translateX(-50%); 
+            font-family: 'Inter', sans-serif; 
+            font-size: 0.75rem; 
+            font-weight: 600; 
+            color: var(--text-color); 
+            opacity: 0.35; 
+            white-space: nowrap; 
+            transition: all 0.3s ease; 
+        }
+        /* 첫 번째와 마지막 글자가 벽에 붙지 않도록 강제 정렬 해제 */
         .time-mark.active {
             opacity: 1; font-weight: 900; color: #000;
             text-shadow: -1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px 1.5px 0 #fff;
@@ -170,23 +189,20 @@
             else mark.classList.remove('active');
         });
 
-        // 진행도 계산
         const currentSec = (h * 3600) + (m * 60) + s;
         const progress = Math.min(Math.max((currentSec - (START_HOUR * 3600)) / ((END_HOUR - START_HOUR) * 3600), 0), 1);
         
-        // 파도 업데이트
         document.getElementById('wave-wrapper').style.width = `${progress * 100}%`;
         
-        // [수정] 삼각형 마커 위치 업데이트
         const marker = document.getElementById('minute-marker');
         marker.style.left = `${progress * 100}%`;
         
-        // 업무 시간 외에는 마커 숨기기
         marker.style.opacity = (h < START_HOUR || h >= END_HOUR) ? '0' : '1';
     }
 
     function createTimeline() {
         const timeline = document.getElementById('timeline');
+        timeline.innerHTML = '<div id="minute-marker"></div>'; // 초기화 후 마커 유지
         for (let i = 0; i <= (END_HOUR - START_HOUR); i++) {
             const h = START_HOUR + i;
             const mark = document.createElement('div');
