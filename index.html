@@ -12,10 +12,10 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Pretendard', sans-serif; background-color: var(--bg-color); height: 100vh; width: 100vw; display: flex; justify-content: center; align-items: center; overflow: hidden; }
 
-        /* --- 상단 타임라인 (수정됨) --- */
+        /* --- 상단 타임라인 --- */
         .timeline-container { 
             position: fixed; top: 0; left: 0; width: 100vw; height: 50px; 
-            padding: 0 25px; /* 좌우 여백을 충분히 주어 10am이 안 잘리게 함 */
+            padding: 0 25px; /* 10am 잘림 방지 */
             z-index: 20; pointer-events: none; 
         }
         .timeline-inner { position: relative; width: 100%; height: 100%; }
@@ -33,18 +33,20 @@
 
         .time-mark { 
             position: absolute; top: 15px; 
-            transform: translateX(-50%); /* 기본은 중앙 정렬 */
+            transform: translateX(-50%);
             font-family: 'Inter', sans-serif; font-size: 0.75rem; font-weight: 700; 
-            color: var(--text-color); opacity: 0.4; white-space: nowrap; transition: all 0.3s ease; 
+            color: var(--text-color); opacity: 0.35; white-space: nowrap; transition: all 0.3s ease; 
         }
         
-        /* 첫 번째 시간(10am)과 마지막 시간 정렬 수정 */
+        /* 첫 번째/마지막 마커 정렬 */
         .time-mark:first-of-type { transform: translateX(0); } 
         .time-mark:last-of-type { transform: translateX(-100%); }
 
+        /* [수정] 하얀색 아웃라인 효과 복구 */
         .time-mark.active {
             opacity: 1; font-weight: 900; color: #000;
             transform: translateX(-50%) scale(1.1);
+            text-shadow: -1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px 1.5px 0 #fff;
         }
         .time-mark:first-of-type.active { transform: translateX(0) scale(1.1); }
         .time-mark:last-of-type.active { transform: translateX(-100%) scale(1.1); }
@@ -60,7 +62,7 @@
             z-index: 15;
         }
 
-        /* --- 파도 애니메이션 --- */
+        /* --- 파도 및 시계 (기존 스타일 유지) --- */
         .background-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
         #wave-wrapper { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background-color: var(--wave-color); transition: width 1s linear; }
         .wave-layer { position: absolute; top: 0; width: 120px; height: 100%; background-repeat: repeat-y; background-size: 100% 600px; }
@@ -69,7 +71,6 @@
         .layer-3 { background-color: var(--wave-color); animation: waveSwing 2s ease-in-out infinite; z-index: 1; opacity: 0.2; right: -40px; }
         @keyframes waveSwing { 0%, 100% { transform: translateX(0px); } 50% { transform: translateX(-20px); } }
 
-        /* --- 중앙 시계 --- */
         .clock-container { 
             width: 600px; height: 300px; 
             text-align: center; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); 
@@ -90,7 +91,6 @@
             cursor: pointer; transition: all 0.3s ease; display: none;
         }
 
-        /* --- 위젯 --- */
         .info-widget { position: fixed; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.5); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05); z-index: 10; width: 120px; height: 120px; top: 50%; }
         .widget-icon { font-size: 3rem; margin-bottom: 5px; }
         .widget-label { font-weight: 800; font-size: 1rem; color: #333; }
@@ -134,6 +134,7 @@
     </div>
 
 <script>
+    /* ... JS 로직은 이전과 동일하므로 유지 ... */
     const CLIENT_ID = '759508147373-jbd92l1p7ta1c4rqh7sel94ce0i843l8.apps.googleusercontent.com';
     const START_HOUR = 10;
     const END_HOUR = 19;
