@@ -12,8 +12,12 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Pretendard', sans-serif; background-color: var(--bg-color); height: 100vh; width: 100vw; display: flex; justify-content: center; align-items: center; overflow: hidden; }
 
-        /* --- 상단 타임라인 --- */
-        .timeline-container { position: fixed; top: 0; left: 0; width: 100vw; height: 40px; padding: 0 10px; z-index: 20; pointer-events: none; }
+        /* --- 상단 타임라인 (수정됨) --- */
+        .timeline-container { 
+            position: fixed; top: 0; left: 0; width: 100vw; height: 50px; 
+            padding: 0 25px; /* 좌우 여백을 충분히 주어 10am이 안 잘리게 함 */
+            z-index: 20; pointer-events: none; 
+        }
         .timeline-inner { position: relative; width: 100%; height: 100%; }
         
         #minute-marker {
@@ -27,24 +31,33 @@
             transition: left 0.5s ease-out;
         }
 
-        .time-mark { position: absolute; top: 12px; transform: translateX(-50%); font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 600; color: var(--text-color); opacity: 0.35; white-space: nowrap; transition: all 0.3s ease; }
-        .time-mark:first-child { transform: translateX(0); }
-        .time-mark:last-child { transform: translateX(-100%); }
+        .time-mark { 
+            position: absolute; top: 15px; 
+            transform: translateX(-50%); /* 기본은 중앙 정렬 */
+            font-family: 'Inter', sans-serif; font-size: 0.75rem; font-weight: 700; 
+            color: var(--text-color); opacity: 0.4; white-space: nowrap; transition: all 0.3s ease; 
+        }
+        
+        /* 첫 번째 시간(10am)과 마지막 시간 정렬 수정 */
+        .time-mark:first-of-type { transform: translateX(0); } 
+        .time-mark:last-of-type { transform: translateX(-100%); }
+
         .time-mark.active {
             opacity: 1; font-weight: 900; color: #000;
-            text-shadow: -1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px 1.5px 0 #fff;
+            transform: translateX(-50%) scale(1.1);
         }
+        .time-mark:first-of-type.active { transform: translateX(0) scale(1.1); }
+        .time-mark:last-of-type.active { transform: translateX(-100%) scale(1.1); }
 
-        /* [추가] 캘린더 일정 막대 스타일 */
+        /* --- 캘린더 일정 막대 --- */
         .event-bar {
             position: absolute;
-            bottom: 0;
+            bottom: 5px;
             height: 6px;
             background: var(--neon-color);
-            box-shadow: 0 0 10px var(--neon-color), 0 0 5px rgba(204, 255, 0, 0.5);
+            box-shadow: 0 0 10px var(--neon-color);
             border-radius: 3px;
             z-index: 15;
-            transition: all 0.5s ease;
         }
 
         /* --- 파도 애니메이션 --- */
@@ -56,7 +69,7 @@
         .layer-3 { background-color: var(--wave-color); animation: waveSwing 2s ease-in-out infinite; z-index: 1; opacity: 0.2; right: -40px; }
         @keyframes waveSwing { 0%, 100% { transform: translateX(0px); } 50% { transform: translateX(-20px); } }
 
-        /* --- 중앙 시계 컨테이너 --- */
+        /* --- 중앙 시계 --- */
         .clock-container { 
             width: 600px; height: 300px; 
             text-align: center; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); 
@@ -69,15 +82,13 @@
         #hour-text, #min-text { display: inline-block; width: 1.25em; text-align: center; }
         #ampm { font-family: 'Inter', sans-serif; font-weight: 900; font-size: 3rem; color: var(--text-color); line-height: 1; }
         #colon { margin: 0; display: inline-block; text-align: center; width: 0.3em; }
-        #status-text { margin-top: 15px; font-size: 0.95rem; font-weight: 600; color: var(--wave-color); opacity: 1; }
+        #status-text { margin-top: 15px; font-size: 0.95rem; font-weight: 600; color: var(--wave-color); }
         
         #auth-btn { 
             margin-top: 15px; padding: 10px 24px; border: none; border-radius: 15px; 
             background: var(--wave-color); color: white; font-weight: 800; 
             cursor: pointer; transition: all 0.3s ease; display: none;
-            box-shadow: 0 4px 15px rgba(90, 155, 213, 0.3);
         }
-        #auth-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(90, 155, 213, 0.4); }
 
         /* --- 위젯 --- */
         .info-widget { position: fixed; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.5); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05); z-index: 10; width: 120px; height: 120px; top: 50%; }
@@ -88,7 +99,6 @@
 
         .click-ripple { position: fixed; width: 20px; height: 20px; background: rgba(90, 155, 213, 0.4); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; animation: rippleAnim 0.6s ease-out forwards; z-index: 99; }
         @keyframes rippleAnim { to { width: 150px; height: 150px; opacity: 0; } }
-
         * { -webkit-user-select: none; user-select: none; }
     </style>
 </head>
@@ -187,7 +197,6 @@
         }
     }
 
-    /* --- [Google Auth Logic] --- */
     function gapiLoaded() { 
         gapi.load('client', async () => { 
             await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'] }); 
@@ -229,28 +238,21 @@
         tokenClient.requestAccessToken({prompt: 'select_account'});
     }
 
-    // [수정] 오늘 전체 일정을 가져와서 막대를 그리도록 변경
     async function listUpcomingEvents() {
         try {
             const token = gapi.client.getToken();
             if (!token) return;
-
             const now = new Date();
             const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
             const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
 
             const response = await gapi.client.calendar.events.list({
-                'calendarId': 'primary',
-                'timeMin': startOfDay,
-                'timeMax': endOfDay,
-                'showDeleted': false,
-                'singleEvents': true,
-                'orderBy': 'startTime'
+                'calendarId': 'primary', 'timeMin': startOfDay, 'timeMax': endOfDay,
+                'showDeleted': false, 'singleEvents': true, 'orderBy': 'startTime'
             });
 
             const events = response.result.items;
             renderEventBars(events);
-
             const upcoming = events.find(e => new Date(e.start.dateTime || e.start.date) > now);
             const statusText = document.getElementById('status-text');
             if (upcoming) {
@@ -261,42 +263,28 @@
             } else {
                 statusText.innerText = events.length > 0 ? "오늘의 모든 일정이 끝났습니다 ✨" : "오늘 일정이 없습니다 ✨";
             }
-        } catch (err) { 
-            if (err.status === 401) refreshAccessToken();
-        }
+        } catch (err) { if (err.status === 401) refreshAccessToken(); }
     }
 
-    // [추가] 캘린더 일정을 막대로 그리는 함수
     function renderEventBars(events) {
         const timeline = document.getElementById('timeline');
-        // 기존 막대 제거
         document.querySelectorAll('.event-bar').forEach(b => b.remove());
-
         events.forEach(event => {
-            if (!event.start.dateTime) return; // 종일 일정은 타임라인 제외
-
+            if (!event.start.dateTime) return;
             const start = new Date(event.start.dateTime);
             const end = new Date(event.end.dateTime);
-            
-            // 소수점 시간 계산 (예: 5시 30분 -> 17.5)
             const startHour = start.getHours() + (start.getMinutes() / 60);
             const endHour = end.getHours() + (end.getMinutes() / 60);
-
-            // 타임라인 표시 범위(10-19) 필터링
             if (endHour < START_HOUR || startHour > END_HOUR) return;
-
             const displayStart = Math.max(startHour, START_HOUR);
             const displayEnd = Math.min(endHour, END_HOUR);
-
             const left = ((displayStart - START_HOUR) / (END_HOUR - START_HOUR)) * 100;
             const width = ((displayEnd - displayStart) / (END_HOUR - START_HOUR)) * 100;
-
             const bar = document.createElement('div');
             bar.className = 'event-bar';
             bar.style.left = `${left}%`;
             bar.style.width = `${width}%`;
-            // 마우스 오버 시 일정 제목 확인용 툴팁
-            bar.title = `${event.summary} (${start.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})})`;
+            bar.title = `${event.summary}`;
             timeline.appendChild(bar);
         });
     }
