@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Workday Wave Clock - Bold Widget Edition</title>
+    <title>Workday Wave Clock - Persistent Login</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;900&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
 
@@ -72,18 +72,13 @@
         }
         #auth-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(90, 155, 213, 0.4); }
 
-        /* --- 위젯 스타일 (Bold 추가) --- */
+        /* --- 위젯 --- */
         .info-widget { position: fixed; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.5); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05); z-index: 10; width: 120px; height: 120px; top: 50%; }
         .widget-icon { font-size: 3rem; margin-bottom: 5px; }
-        
-        /* [수정] 위젯 텍스트 Bold 처리 */
         .widget-label { font-weight: 800; font-size: 1rem; color: #333; }
 
         #weather-widget { left: calc(25vw - 150px); transform: translate(-50%, -50%); }
         #dust-widget { right: calc(25vw - 150px); transform: translate(50%, -50%); }
-
-        .click-ripple { position: absolute; background: rgba(255, 255, 255, 0.5); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; animation: ripple-out 2s ease-out forwards; z-index: 5; }
-        @keyframes ripple-out { 0% { width: 0; height: 0; } 100% { width: 250px; height: 250px; opacity: 0; } }
 
         * { -webkit-user-select: none; user-select: none; }
     </style>
@@ -174,17 +169,22 @@
         }
     }
 
+    /* --- [핵심] 로그인 유지 및 자동 복구 로직 --- */
     function gapiLoaded() { gapi.load('client', async () => { await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'] }); checkInit(); }); }
     function gisLoaded() { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/calendar.events.readonly', callback: '' }); checkInit(); }
     
     function checkInit() { 
         if (typeof gapi !== 'undefined' && tokenClient) {
-            if (gapi.client.getToken() === null) {
-                document.getElementById('auth-btn').style.display = "block";
-                document.getElementById('status-text').innerText = "캘린더를 연결해주세요 🗓️";
-            } else {
+            // 브라우저 저장소에서 기존 토큰 확인
+            const storedToken = localStorage.getItem('gapi_token');
+            if (storedToken) {
+                const token = JSON.parse(storedToken);
+                gapi.client.setToken(token);
                 document.getElementById('auth-btn').style.display = "none";
                 listUpcomingEvents();
+            } else {
+                document.getElementById('auth-btn').style.display = "block";
+                document.getElementById('status-text').innerText = "캘린더를 연결해주세요 🗓️";
             }
         } 
     }
@@ -192,6 +192,10 @@
     function handleAuthClick() {
         tokenClient.callback = async (resp) => {
             if (resp.error !== undefined) throw (resp);
+            
+            // 토큰을 로컬 스토리지에 저장
+            localStorage.setItem('gapi_token', JSON.stringify(resp));
+            
             document.getElementById('auth-btn').style.display = "none";
             await listUpcomingEvents();
         };
@@ -200,7 +204,7 @@
 
     async function listUpcomingEvents() {
         try {
-            if (gapi.client.getToken() === null) return;
+            if (!gapi.client.getToken()) return;
             const response = await gapi.client.calendar.events.list({
                 'calendarId': 'primary', 'timeMin': (new Date()).toISOString(),
                 'showDeleted': false, 'singleEvents': true, 'maxResults': 1, 'orderBy': 'startTime'
@@ -216,10 +220,18 @@
             } else {
                 statusText.innerText = "남은 일정 없음 ✨";
             }
-        } catch (err) { console.error("Calendar Error:", err); }
+        } catch (err) { 
+            console.error("Calendar Error:", err);
+            // 만약 토큰이 만료(401)되었다면 저장소 비우고 로그인 버튼 다시 띄우기
+            if (err.status === 401) {
+                localStorage.removeItem('gapi_token');
+                document.getElementById('auth-btn').style.display = "block";
+                document.getElementById('status-text').innerText = "인증 만료. 다시 로그인해주세요.";
+            }
+        }
     }
 
-    setInterval(listUpcomingEvents, 300000);
+    setInterval(listUpcomingEvents, 300000); // 5분 자동 갱신
 
     window.addEventListener('mousedown', (e) => {
         if (e.target.closest('.info-widget') || e.target.closest('.clock-container')) return;
