@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Workday Wave Clock - Focused Edition</title>
+    <title>Workday Wave Clock - Bold Widget Edition</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;900&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
 
@@ -34,21 +34,36 @@
 
         /* --- 중앙 시계 컨테이너 --- */
         .clock-container { 
-            width: 600px; height: 300px; /* 버튼 공간을 위해 높이 약간 조절 */
+            width: 600px; height: 300px; 
             text-align: center; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); 
             border-radius: 40px; z-index: 10; border: 1px solid rgba(255, 255, 255, 0.5); 
             display: flex; flex-direction: column; justify-content: center; align-items: center; 
             box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1); 
         }
-        .time-wrapper { display: flex; align-items: baseline; justify-content: center; gap: 15px; }
-        #clock { font-family: 'Inter', sans-serif; font-size: 6rem; font-weight: 900; letter-spacing: -2px; line-height: 1; display: flex; align-items: center; }
-        #ampm { font-family: 'Inter', sans-serif; font-weight: 900; font-size: 3rem; color: var(--text-color); line-height: 1; }
-        #colon { margin: 0 2px; display: inline-block; text-align: center; width: 0.3em; }
+        .time-wrapper { display: flex; align-items: baseline; justify-content: center; gap: 10px; }
         
-        /* 일정 텍스트 스타일 */
+        #clock { 
+            font-family: 'Inter', sans-serif; 
+            font-size: 6rem; 
+            font-weight: 900; 
+            letter-spacing: -2px; 
+            line-height: 1; 
+            display: flex; 
+            align-items: center;
+            font-variant-numeric: tabular-nums; 
+        }
+        
+        #hour-text, #min-text {
+            display: inline-block;
+            width: 1.25em; 
+            text-align: center;
+        }
+
+        #ampm { font-family: 'Inter', sans-serif; font-weight: 900; font-size: 3rem; color: var(--text-color); line-height: 1; }
+        #colon { margin: 0; display: inline-block; text-align: center; width: 0.3em; }
+        
         #status-text { margin-top: 15px; font-size: 0.95rem; font-weight: 600; color: var(--wave-color); opacity: 1; }
         
-        /* 로그인 버튼 스타일 (시계 아래 위치) */
         #auth-btn { 
             margin-top: 15px; padding: 10px 24px; border: none; border-radius: 15px; 
             background: var(--wave-color); color: white; font-weight: 800; 
@@ -57,9 +72,13 @@
         }
         #auth-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(90, 155, 213, 0.4); }
 
-        /* --- 위젯 --- */
+        /* --- 위젯 스타일 (Bold 추가) --- */
         .info-widget { position: fixed; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.5); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05); z-index: 10; width: 120px; height: 120px; top: 50%; }
         .widget-icon { font-size: 3rem; margin-bottom: 5px; }
+        
+        /* [수정] 위젯 텍스트 Bold 처리 */
+        .widget-label { font-weight: 800; font-size: 1rem; color: #333; }
+
         #weather-widget { left: calc(25vw - 150px); transform: translate(-50%, -50%); }
         #dust-widget { right: calc(25vw - 150px); transform: translate(50%, -50%); }
 
@@ -86,7 +105,11 @@
     <div class="clock-container">
         <div class="time-wrapper">
             <span id="ampm">AM</span>
-            <div id="clock"><span id="hour-text">00</span><span id="colon">:</span><span id="min-text">00</span></div>
+            <div id="clock">
+                <span id="hour-text">00</span>
+                <span id="colon">:</span>
+                <span id="min-text">00</span>
+            </div>
         </div>
         <div id="status-text">🌊 파도를 타는 중...</div>
         <button id="auth-btn" onclick="handleAuthClick()">Google Login</button>
@@ -151,7 +174,6 @@
         }
     }
 
-    /* --- 캘린더 통합 로직 --- */
     function gapiLoaded() { gapi.load('client', async () => { await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'] }); checkInit(); }); }
     function gisLoaded() { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/calendar.events.readonly', callback: '' }); checkInit(); }
     
@@ -197,7 +219,7 @@
         } catch (err) { console.error("Calendar Error:", err); }
     }
 
-    setInterval(listUpcomingEvents, 300000); // 5분 자동 갱신
+    setInterval(listUpcomingEvents, 300000);
 
     window.addEventListener('mousedown', (e) => {
         if (e.target.closest('.info-widget') || e.target.closest('.clock-container')) return;
