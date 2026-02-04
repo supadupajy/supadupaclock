@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Workday Wave Clock - Auto Refresh</title>
+    <title>Workday Wave Clock - Focused Edition</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;900&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
 
@@ -18,7 +18,6 @@
         .time-mark { position: absolute; top: 0; transform: translateX(-50%); font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 600; color: var(--text-color); opacity: 0.35; white-space: nowrap; transition: all 0.3s ease; }
         .time-mark:first-child { transform: translateX(0); }
         .time-mark:last-child { transform: translateX(-100%); }
-
         .time-mark.active {
             opacity: 1; font-weight: 900; color: #000;
             text-shadow: -1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px 1.5px 0 #fff;
@@ -33,13 +32,30 @@
         .layer-3 { background-color: var(--wave-color); animation: waveSwing 2s ease-in-out infinite; z-index: 1; opacity: 0.2; right: -40px; }
         @keyframes waveSwing { 0%, 100% { transform: translateX(0px); } 50% { transform: translateX(-20px); } }
 
-        /* --- 중앙 시계 --- */
-        .clock-container { width: 600px; height: 250px; text-align: center; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); border-radius: 40px; z-index: 10; border: 1px solid rgba(255, 255, 255, 0.5); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1); }
+        /* --- 중앙 시계 컨테이너 --- */
+        .clock-container { 
+            width: 600px; height: 300px; /* 버튼 공간을 위해 높이 약간 조절 */
+            text-align: center; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); 
+            border-radius: 40px; z-index: 10; border: 1px solid rgba(255, 255, 255, 0.5); 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1); 
+        }
         .time-wrapper { display: flex; align-items: baseline; justify-content: center; gap: 15px; }
         #clock { font-family: 'Inter', sans-serif; font-size: 6rem; font-weight: 900; letter-spacing: -2px; line-height: 1; display: flex; align-items: center; }
         #ampm { font-family: 'Inter', sans-serif; font-weight: 900; font-size: 3rem; color: var(--text-color); line-height: 1; }
         #colon { margin: 0 2px; display: inline-block; text-align: center; width: 0.3em; }
-        #status-text { margin-top: 10px; font-size: 1.1rem; font-weight: 600; opacity: 0.8; }
+        
+        /* 일정 텍스트 스타일 */
+        #status-text { margin-top: 15px; font-size: 1.2rem; font-weight: 600; color: #333; opacity: 0.9; }
+        
+        /* 로그인 버튼 스타일 (시계 아래 위치) */
+        #auth-btn { 
+            margin-top: 15px; padding: 10px 24px; border: none; border-radius: 15px; 
+            background: var(--wave-color); color: white; font-weight: 800; 
+            cursor: pointer; transition: all 0.3s ease; display: none;
+            box-shadow: 0 4px 15px rgba(90, 155, 213, 0.3);
+        }
+        #auth-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(90, 155, 213, 0.4); }
 
         /* --- 위젯 --- */
         .info-widget { position: fixed; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.5); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05); z-index: 10; width: 120px; height: 120px; top: 50%; }
@@ -47,9 +63,9 @@
         #weather-widget { left: calc(25vw - 150px); transform: translate(-50%, -50%); }
         #dust-widget { right: calc(25vw - 150px); transform: translate(50%, -50%); }
 
-        #calendar-widget { bottom: 30px; left: 50%; transform: translateX(-50%); width: auto; min-width: 380px; height: 70px; padding: 0 25px; flex-direction: row; gap: 15px; top: auto; }
-        #auth-btn { padding: 8px 16px; border: none; border-radius: 12px; background: var(--wave-color); color: white; font-weight: bold; cursor: pointer; display: none; }
-        .event-text { font-size: 0.95rem; font-weight: 600; color: #333; }
+        .click-ripple { position: absolute; background: rgba(255, 255, 255, 0.5); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; animation: ripple-out 2s ease-out forwards; z-index: 5; }
+        @keyframes ripple-out { 0% { width: 0; height: 0; } 100% { width: 250px; height: 250px; opacity: 0; } }
+
         * { -webkit-user-select: none; user-select: none; }
     </style>
 </head>
@@ -65,12 +81,6 @@
         <div id="dust-status" class="widget-label">--</div>
     </div>
 
-    <div id="calendar-widget" class="info-widget">
-        <div class="widget-icon" style="font-size: 1.8rem; margin: 0;">📅</div>
-        <div id="event-display" class="event-text">연결 대기 중...</div>
-        <button id="auth-btn" onclick="handleAuthClick()">Login</button>
-    </div>
-
     <div class="background-container"><div id="wave-wrapper"><div class="wave-layer layer-1"></div><div class="wave-layer layer-2"></div><div class="wave-layer layer-3"></div></div></div>
     
     <div class="clock-container">
@@ -79,6 +89,7 @@
             <div id="clock"><span id="hour-text">00</span><span id="colon">:</span><span id="min-text">00</span></div>
         </div>
         <div id="status-text">🌊 파도를 타는 중...</div>
+        <button id="auth-btn" onclick="handleAuthClick()">Google Login</button>
     </div>
 
 <script>
@@ -101,7 +112,7 @@
                 const aqi = dData.data.aqi;
                 document.getElementById('dust-status').innerText = aqi <= 50 ? "좋음" : (aqi <= 100 ? "보통" : "나쁨");
                 document.getElementById('dust-icon').innerText = aqi <= 50 ? "😊" : (aqi <= 100 ? "🙂" : "😷");
-            } catch (e) { console.error("날씨 로드 실패"); }
+            } catch (e) { console.error("데이터 로드 실패"); }
         });
     }
 
@@ -140,7 +151,7 @@
         }
     }
 
-    /* --- [수정] 캘린더 자동 업데이트 로직 --- */
+    /* --- 캘린더 통합 로직 --- */
     function gapiLoaded() { gapi.load('client', async () => { await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'] }); checkInit(); }); }
     function gisLoaded() { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/calendar.events.readonly', callback: '' }); checkInit(); }
     
@@ -148,8 +159,8 @@
         if (typeof gapi !== 'undefined' && tokenClient) {
             if (gapi.client.getToken() === null) {
                 document.getElementById('auth-btn').style.display = "block";
+                document.getElementById('status-text').innerText = "캘린더를 연결해주세요 🗓️";
             } else {
-                // 이미 로그인 된 상태면 버튼 숨기고 일정 로드
                 document.getElementById('auth-btn').style.display = "none";
                 listUpcomingEvents();
             }
@@ -159,7 +170,7 @@
     function handleAuthClick() {
         tokenClient.callback = async (resp) => {
             if (resp.error !== undefined) throw (resp);
-            document.getElementById('auth-btn').style.display = "none"; // 로그인 성공 시 버튼 숨김
+            document.getElementById('auth-btn').style.display = "none";
             await listUpcomingEvents();
         };
         tokenClient.requestAccessToken({prompt: 'consent'});
@@ -168,33 +179,25 @@
     async function listUpcomingEvents() {
         try {
             if (gapi.client.getToken() === null) return;
-            
             const response = await gapi.client.calendar.events.list({
                 'calendarId': 'primary', 'timeMin': (new Date()).toISOString(),
                 'showDeleted': false, 'singleEvents': true, 'maxResults': 1, 'orderBy': 'startTime'
             });
             const event = response.result.items[0];
-            const display = document.getElementById('event-display');
+            const statusText = document.getElementById('status-text');
             
             if (event) {
                 const startData = event.start.dateTime || event.start.date;
                 const startDate = new Date(startData);
-                const timeStr = event.start.dateTime ? 
-                    startDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : "All Day";
-                
-                display.innerText = `[${timeStr}] ${event.summary}`;
-                document.getElementById('status-text').innerText = `다음 일정: ${event.summary} 🗓️`;
+                const timeStr = event.start.dateTime ? startDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : "All Day";
+                statusText.innerText = `다음 일정: [${timeStr}] ${event.summary} 🗓️`;
             } else {
-                display.innerText = "남은 일정 없음 ✨";
+                statusText.innerText = "남은 일정 없음 ✨";
             }
-            console.log("Calendar Auto-Refreshed");
-        } catch (err) {
-            console.error("Calendar Error:", err);
-        }
+        } catch (err) { console.error("Calendar Error:", err); }
     }
 
-    /* --- [핵심] 5분(300,000ms)마다 일정 자동 갱신 --- */
-    setInterval(listUpcomingEvents, 300000);
+    setInterval(listUpcomingEvents, 300000); // 5분 자동 갱신
 
     window.addEventListener('mousedown', (e) => {
         if (e.target.closest('.info-widget') || e.target.closest('.clock-container')) return;
