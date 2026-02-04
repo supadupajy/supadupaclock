@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workday Wave Clock - Timeline Highlight Edition</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;900&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
+
+    <style>
+        :root { --bg-color: #ffffff; --wave-color: #5a9bd5; --text-color: #000000; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Pretendard', sans-serif; background-color: var(--bg-color); height: 100vh; width: 100vw; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+
+        /* --- 상단 타임라인 --- */
+        .timeline-container { position: fixed; top: 4px; left: 0; width: 100vw; height: 20px; padding: 0 10px; z-index: 20; pointer-events: none; }
+        .timeline-inner { position: relative; width: 100%; height: 100%; }
+        .time-mark { 
+            position: absolute; top: 0; transform: translateX(-50%); 
+            font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 600; 
+            color: var(--text-color); opacity: 0.35; white-space: nowrap;
+            transition: all 0.3s ease; /* 강조 효과가 부드럽게 전환됨 */
+        }
+        .time-mark:first-child { transform: translateX(0); }
+        .time-mark:last-child { transform: translateX(-100%); }
+
+        /* [수정] 현재 시간대 강조 스타일 */
+        .time-mark.active {
+            opacity: 1;
+            font-weight: 900;
+            color: #000;
+            /* 하얀색 아웃라인 효과 */
+            text-shadow: 
+                -1.5px -1.5px 0 #fff,  
+                 1.5px -1.5px 0 #fff,
+                -1.5px  1.5px 0 #fff,
+                 1.5px  1.5px 0 #fff;
+        }
+
+        /* --- 파도 애니메이션 --- */
+        .background-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
+        #wave-wrapper { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background-color: var(--wave-color); transition: width 1s linear; }
+        .wave-layer { position: absolute; top: 0; width: 120px; height: 100%; background-repeat: repeat-y; background-size: 100% 600px; }
+        .layer-1 { background-color: var(--wave-color); animation: waveSwing 3s ease-in-out infinite; z-index: 3; right: -30px; }
+        .layer-2 { background-color: var(--wave-color); animation: waveSwing 4.5s ease-in-out infinite reverse; z-index: 2; opacity: 0.5; right: -35px; }
+        .layer-3 { background-color: var(--wave-color); animation: waveSwing 2s ease-in-out infinite; z-index: 1; opacity: 0.2; right: -40px; }
+        @keyframes waveSwing { 0%, 100% { transform: translateX(0px); } 50% { transform: translateX(-20px); } }
+
+        /* --- 중앙 시계 컨테이너 --- */
+        .clock-container { width: 600px; height: 250px; text-align: center; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); border-radius: 40px; z-index: 10; border: 1px solid rgba(255, 255, 255, 0.5); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1); }
+        .time-wrapper { display: flex; align-items: baseline; justify-content: center; gap: 15px; }
+        #clock { font-family: 'Inter', sans-serif; font-size: 6rem; font-weight: 900; letter-spacing: -2px; line-height: 1; display: flex; align-items: center; }
+        #ampm { font-family: 'Inter', sans-serif; font-weight: 900; font-size: 3rem; color: var(--text-color); line-height: 1; }
+        #colon { margin: 0 2px; display: inline-block; text-align: center; width: 0.3em; }
+        #status-text { margin-top: 10px; font-size: 1.1rem; font-weight: 600; opacity: 0.8; }
+
+        /* --- 위젯 위치 (정중앙 밸런스) --- */
+        .info-widget { position: fixed; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.5); display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05); z-index: 10; width: 120px; height: 120px; top: 50%; }
+        .widget-icon { font-size: 3rem; margin-bottom: 5px; }
+        #weather-widget { left: calc(25vw - 150px); transform: translate(-50%, -50%); }
+        #dust-widget { right: calc(25vw - 150px); transform: translate(50%, -50%); }
+
+        #calendar-widget { bottom: 30px; left: 50%; transform: translateX(-50%); width: auto; min-width: 380px; height: 70px; padding: 0 25px; flex-direction: row; gap: 15px; top: auto; }
+        #auth-btn { padding: 8px 16px; border: none; border-radius: 12px; background: var(--wave-color); color: white; font-weight: bold; cursor: pointer; }
+        .event-text { font-size: 0.95rem; font-weight: 600; color: #333; }
+        * { -webkit-user-select: none; user-select: none; }
+    </style>
+</head>
+<body>
+    <div class="timeline-container"><div id="timeline" class="timeline-inner"></div></div>
+
+    <div id="weather-widget" class="info-widget">
+        <div id="weather-icon" class="widget-icon">☀️</div>
+        <div id="weather-temp" class="widget-label">--°C</div>
+    </div>
+    <div id="dust-widget" class="info-widget">
+        <div id="dust-icon" class="widget-icon">😊</div>
+        <div id="dust-status" class="widget-label">--</div>
+    </div>
+
+    <div id="calendar-widget" class="info-widget">
+        <div class="widget-icon" style="font-size: 1.8rem; margin: 0;">📅</div>
+        <div id="event-display" class="event-text">캘린더를 연결하세요.</div>
+        <button id="auth-btn" onclick="handleAuthClick()">Login</button>
+    </div>
+
+    <div class="background-container"><div id="wave-wrapper"><div class="wave-layer layer-1"></div><div class="wave-layer layer-2"></div><div class="wave-layer layer-3"></div></div></div>
+    
+    <div class="clock-container">
+        <div class="time-wrapper">
+            <span id="ampm">AM</span>
+            <div id="clock"><span id="hour-text">00</span><span id="colon">:</span><span id="min-text">00</span></div>
+        </div>
+        <div id="status-text">🌊 파도를 타는 중...</div>
+    </div>
+
+<script>
+    const CLIENT_ID = '759508147373-jbd92l1p7ta1c4rqh7sel94ce0i843l8.apps.googleusercontent.com';
+    const START_HOUR = 10;
+    const END_HOUR = 19;
+
+    async function updateWeather() {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const { latitude: lat, longitude: lon } = pos.coords;
+            try {
+                const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+                const wData = await wRes.json();
+                document.getElementById('weather-temp').innerText = `${Math.round(wData.current_weather.temperature)}°C`;
+                const icons = { 0: '☀️', 1: '⛅', 2: '⛅', 3: '☁️', 45: '🌫️', 51: '🌧️', 61: '🌧️', 71: '❄️', 95: '⚡' };
+                document.getElementById('weather-icon').innerText = icons[wData.current_weather.weathercode] || '⛅';
+
+                const dRes = await fetch(`https://api.waqi.info/feed/here/?token=demo`);
+                const dData = await dRes.json();
+                const aqi = dData.data.aqi;
+                document.getElementById('dust-status').innerText = aqi <= 50 ? "좋음" : (aqi <= 100 ? "보통" : "나쁨");
+                document.getElementById('dust-icon').innerText = aqi <= 50 ? "😊" : (aqi <= 100 ? "🙂" : "😷");
+            } catch (e) { console.error("데이터 로드 실패"); }
+        });
+    }
+
+    function updateClock() {
+        const now = new Date();
+        const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds(), ms = now.getMilliseconds();
+        
+        document.getElementById('ampm').innerText = h >= 12 ? 'PM' : 'AM';
+        document.getElementById('hour-text').innerText = String(h % 12 || 12).padStart(2, '0');
+        document.getElementById('min-text').innerText = String(m).padStart(2, '0');
+        
+        // 0.5초 주기 깜빡임
+        const colon = document.getElementById('colon');
+        colon.style.visibility = (ms < 500) ? 'visible' : 'hidden';
+
+        // [추가] 타임라인 현재 시간 강조 로직
+        const marks = document.querySelectorAll('.time-mark');
+        marks.forEach(mark => {
+            if (parseInt(mark.dataset.hour) === h) {
+                mark.classList.add('active');
+            } else {
+                mark.classList.remove('active');
+            }
+        });
+
+        const currentSec = (h * 3600) + (m * 60) + s;
+        const progress = Math.min(Math.max((currentSec - (START_HOUR * 3600)) / ((END_HOUR - START_HOUR) * 3600), 0), 1);
+        document.getElementById('wave-wrapper').style.width = `${progress * 100}%`;
+    }
+
+    function createTimeline() {
+        const timeline = document.getElementById('timeline');
+        for (let i = 0; i <= (END_HOUR - START_HOUR); i++) {
+            const h = START_HOUR + i;
+            const mark = document.createElement('div');
+            mark.className = 'time-mark';
+            mark.dataset.hour = h; // 시간 비교를 위한 데이터 속성 추가
+            mark.style.left = `${(i / (END_HOUR - START_HOUR)) * 100}%`;
+            mark.innerText = h < 12 ? `${h}am` : (h === 12 ? `12pm` : `${h - 12}pm`);
+            timeline.appendChild(mark);
+        }
+    }
+
+    // 구글 캘린더 로직
+    function gapiLoaded() { gapi.load('client', async () => { await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'] }); checkInit(); }); }
+    function gisLoaded() { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/calendar.events.readonly', callback: '' }); checkInit(); }
+    function checkInit() { if (typeof gapi !== 'undefined' && tokenClient) document.getElementById('auth-btn').style.display = "block"; }
+    function handleAuthClick() { tokenClient.callback = async (resp) => { await listUpcomingEvents(); }; tokenClient.requestAccessToken({prompt: 'consent'}); }
+    async function listUpcomingEvents() { const response = await gapi.client.calendar.events.list({ 'calendarId': 'primary', 'timeMin': (new Date()).toISOString(), 'showDeleted': false, 'singleEvents': true, 'maxResults': 1, 'orderBy': 'startTime' }); const event = response.result.items[0]; if (event) { document.getElementById('event-display').innerText = `[${new Date(event.start.dateTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}] ${event.summary}`; } }
+
+    window.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.info-widget') || e.target.closest('.clock-container')) return;
+        const ripple = document.createElement('div');
+        ripple.className = 'click-ripple';
+        document.body.appendChild(ripple);
+        ripple.style.left = `${e.clientX}px`; ripple.style.top = `${e.clientY}px`;
+        ripple.addEventListener('animationend', () => ripple.remove());
+    });
+
+    createTimeline(); updateClock(); updateWeather();
+    setInterval(updateClock, 100); 
+    setInterval(updateWeather, 600000);
+</script>
+<script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+<script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+</body>
+</html>
