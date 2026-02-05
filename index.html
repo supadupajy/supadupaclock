@@ -134,7 +134,6 @@
     </div>
 
 <script>
-    /* ... JS 로직은 이전과 동일하므로 유지 ... */
     const CLIENT_ID = '759508147373-jbd92l1p7ta1c4rqh7sel94ce0i843l8.apps.googleusercontent.com';
     const START_HOUR = 10;
     const END_HOUR = 19;
@@ -153,8 +152,25 @@
                 const dRes = await fetch(`https://api.waqi.info/feed/here/?token=demo`);
                 const dData = await dRes.json();
                 const aqi = dData.data.aqi;
-                document.getElementById('dust-status').innerText = aqi <= 50 ? "좋음" : (aqi <= 100 ? "보통" : "나쁨");
-                document.getElementById('dust-icon').innerText = aqi <= 50 ? "😊" : (aqi <= 100 ? "🙂" : "😷");
+                
+                // 미세먼지 상태 및 아이콘 로직 업데이트
+                let status, icon;
+                if (aqi <= 50) {
+                    status = "좋음";
+                    icon = "😊";
+                } else if (aqi <= 100) {
+                    status = "보통";
+                    icon = "🙂";
+                } else if (aqi <= 150) {
+                    status = "나쁨";
+                    icon = "😫"; // 웃지 않는 찡그린 표정으로 변경
+                } else {
+                    status = "매우나쁨";
+                    icon = "☠️"; // 매우나쁨 단계 추가
+                }
+                
+                document.getElementById('dust-status').innerText = status;
+                document.getElementById('dust-icon').innerText = icon;
             } catch (e) { console.error("데이터 로드 실패"); }
         });
     }
