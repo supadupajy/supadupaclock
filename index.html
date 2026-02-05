@@ -15,7 +15,7 @@
         /* --- 상단 타임라인 --- */
         .timeline-container { 
             position: fixed; top: 0; left: 0; width: 100vw; height: 50px; 
-            padding: 0 25px; /* 10am 잘림 방지 */
+            padding: 0 25px; 
             z-index: 20; pointer-events: none; 
         }
         .timeline-inner { position: relative; width: 100%; height: 100%; }
@@ -38,11 +38,9 @@
             color: var(--text-color); opacity: 0.35; white-space: nowrap; transition: all 0.3s ease; 
         }
         
-        /* 첫 번째/마지막 마커 정렬 */
         .time-mark:first-of-type { transform: translateX(0); } 
         .time-mark:last-of-type { transform: translateX(-100%); }
 
-        /* [수정] 하얀색 아웃라인 효과 복구 */
         .time-mark.active {
             opacity: 1; font-weight: 900; color: #000;
             transform: translateX(-50%) scale(1.1);
@@ -62,7 +60,7 @@
             z-index: 15;
         }
 
-        /* --- 파도 및 시계 (기존 스타일 유지) --- */
+        /* --- 파도 및 시계 --- */
         .background-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
         #wave-wrapper { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background-color: var(--wave-color); transition: width 1s linear; }
         .wave-layer { position: absolute; top: 0; width: 120px; height: 100%; background-repeat: repeat-y; background-size: 100% 600px; }
@@ -74,10 +72,22 @@
         .clock-container { 
             width: 600px; height: 300px; 
             text-align: center; background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(20px); 
-            border-radius: 40px; z-index: 10; border: 1px solid rgba(255, 255, 255, 0.5); 
+            border-radius: 40px; z-index: 10; border: 2px solid rgba(255, 255, 255, 0.5); 
             display: flex; flex-direction: column; justify-content: center; align-items: center; 
             box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1); 
+            transition: all 0.3s ease;
         }
+
+        /* [추가] 알람 깜빡임 애니메이션 */
+        @keyframes alarm-flash {
+            0%, 100% { border-color: rgba(255, 255, 255, 0.5); box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1); }
+            50% { border-color: #ff4d4d; box-shadow: 0 0 30px rgba(255, 77, 77, 0.6); }
+        }
+        .clock-container.upcoming-alert {
+            animation: alarm-flash 0.8s infinite;
+            border-width: 4px;
+        }
+
         .time-wrapper { display: flex; align-items: baseline; justify-content: center; gap: 10px; }
         #clock { font-family: 'Inter', sans-serif; font-size: 6rem; font-weight: 900; letter-spacing: -2px; line-height: 1; display: flex; align-items: center; font-variant-numeric: tabular-nums; }
         #hour-text, #min-text { display: inline-block; width: 1.25em; text-align: center; }
@@ -120,7 +130,7 @@
 
     <div class="background-container"><div id="wave-wrapper"><div class="wave-layer layer-1"></div><div class="wave-layer layer-2"></div><div class="wave-layer layer-3"></div></div></div>
     
-    <div class="clock-container">
+    <div class="clock-container" id="clock-widget">
         <div class="time-wrapper">
             <span id="ampm">AM</span>
             <div id="clock">
@@ -138,6 +148,7 @@
     const START_HOUR = 10;
     const END_HOUR = 19;
     let tokenClient;
+    let cachedEvents = []; // [추가] 실시간 알람 확인을 위한 이벤트 저장소
 
     async function updateWeather() {
         navigator.geolocation.getCurrentPosition(async (pos) => {
@@ -153,21 +164,11 @@
                 const dData = await dRes.json();
                 const aqi = dData.data.aqi;
                 
-                // 미세먼지 상태 및 아이콘 로직 업데이트
                 let status, icon;
-                if (aqi <= 50) {
-                    status = "좋음";
-                    icon = "😊";
-                } else if (aqi <= 100) {
-                    status = "보통";
-                    icon = "🙂";
-                } else if (aqi <= 150) {
-                    status = "나쁨";
-                    icon = "😫"; // 웃지 않는 찡그린 표정으로 변경
-                } else {
-                    status = "매우나쁨";
-                    icon = "☠️"; // 매우나쁨 단계 추가
-                }
+                if (aqi <= 50) { status = "좋음"; icon = "😊"; }
+                else if (aqi <= 100) { status = "보통"; icon = "🙂"; }
+                else if (aqi <= 150) { status = "나쁨"; icon = "😫"; }
+                else { status = "매우나쁨"; icon = "☠️"; }
                 
                 document.getElementById('dust-status').innerText = status;
                 document.getElementById('dust-icon').innerText = icon;
@@ -199,6 +200,30 @@
         const marker = document.getElementById('minute-marker');
         marker.style.left = `${progress * 100}%`;
         marker.style.opacity = (h < START_HOUR || h >= END_HOUR) ? '0' : '1';
+
+        // [추가] 5분 전 빨간색 알람 체크 로직
+        checkUpcomingAlert(now);
+    }
+
+    // [추가] 일정 시작 5분 전인지 확인하고 클래스를 토글하는 함수
+    function checkUpcomingAlert(now) {
+        const clockWidget = document.getElementById('clock-widget');
+        let isAlertActive = false;
+
+        cachedEvents.forEach(event => {
+            if (event.start && event.start.dateTime) {
+                const startTime = new Date(event.start.dateTime).getTime();
+                const diffMinutes = (startTime - now.getTime()) / (1000 * 60);
+
+                // 시작 5분 전(0분~5분 사이)일 때
+                if (diffMinutes > 0 && diffMinutes <= 5) {
+                    isAlertActive = true;
+                }
+            }
+        });
+
+        if (isAlertActive) clockWidget.classList.add('upcoming-alert');
+        else clockWidget.classList.remove('upcoming-alert');
     }
 
     function createTimeline() {
@@ -269,6 +294,7 @@
             });
 
             const events = response.result.items;
+            cachedEvents = events; // [추가] 알람 체크를 위해 전역 변수에 저장
             renderEventBars(events);
             const upcoming = events.find(e => new Date(e.start.dateTime || e.start.date) > now);
             const statusText = document.getElementById('status-text');
