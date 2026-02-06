@@ -48,7 +48,7 @@
         /* --- 캘린더 일정 막대 --- */
         .event-bar {
             position: absolute; bottom: 5px; height: 6px;
-            background: #ff7043; border-radius: 3px; z-index: 15;
+            background: #33FF33; border-radius: 3px; z-index: 15;
             box-shadow: 0 0 8px rgba(255, 112, 67, 0.5);
         }
 
@@ -146,7 +146,7 @@
         // 해변 아이콘 랜덤 배치
         function spawnBeachItems() {
             const layer = document.getElementById('beach-items-layer');
-            const icons = ['🦀', '🐚', '⭐', '🪨', '🌿', '🐚', '🐚', '🪨'];
+            const icons = ['🦀', '🐚', '⭐', '🪨', '🌿', '🐚', '🦀', '🪨'];
             for (let i = 0; i < 12; i++) {
                 const item = document.createElement('span');
                 item.className = 'beach-item';
