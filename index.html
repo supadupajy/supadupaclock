@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Workday Wave Clock - Beach Edition</title>
+    <title>Workday Wave Clock - Full Beach Edition</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;900&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
 
@@ -45,6 +45,13 @@
         }
         .time-mark.active { opacity: 1; font-weight: 900; color: #000; transform: translateX(-50%) scale(1.1); text-shadow: -1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px 1.5px 0 #fff; }
 
+        /* --- 캘린더 일정 막대 --- */
+        .event-bar {
+            position: absolute; bottom: 5px; height: 6px;
+            background: #ff7043; border-radius: 3px; z-index: 15;
+            box-shadow: 0 0 8px rgba(255, 112, 67, 0.5);
+        }
+
         /* --- 파도 및 배경 --- */
         .background-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
         #wave-wrapper { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background-color: var(--wave-color); transition: width 1s linear; box-shadow: 5px 0 15px rgba(0,0,0,0.1); }
@@ -54,28 +61,36 @@
         .layer-3 { background-color: var(--wave-color); animation: waveSwing 2s ease-in-out infinite; z-index: 1; opacity: 0.2; right: -40px; }
         @keyframes waveSwing { 0%, 100% { transform: translateX(0px); } 50% { transform: translateX(-25px); } }
 
-        /* [수정] 해변 아이콘 스타일 */
+        /* 해변 아이콘 */
         #beach-items-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: -2; }
-        .beach-item {
-            position: absolute;
-            font-size: 2rem; /* 기본 크기 */
-            user-select: none;
-            filter: drop-shadow(2px 4px 3px rgba(0,0,0,0.15)); /* 모래 위 그림자 */
-            display: inline-block;
-        }
+        .beach-item { position: absolute; font-size: 2rem; user-select: none; filter: drop-shadow(2px 4px 3px rgba(0,0,0,0.15)); display: inline-block; }
 
-        /* --- 시계 및 위젯 --- */
+        /* --- 시계 콘테이너 --- */
         .clock-container { 
             width: 600px; height: 300px; text-align: center; background: rgba(255, 255, 255, 0.3); backdrop-filter: blur(15px); 
             border-radius: 40px; z-index: 10; border: 2px solid rgba(255, 255, 255, 0.4); 
             display: flex; flex-direction: column; justify-content: center; align-items: center; 
             box-shadow: 0 25px 50px rgba(0, 0, 0, 0.08); transition: all 0.3s ease;
         }
+
+        /* 5분 전 알림 애니메이션 */
+        @keyframes alarm-flash {
+            0%, 100% { border-color: rgba(255, 255, 255, 0.5); }
+            50% { border-color: #ff4d4d; box-shadow: 0 0 30px rgba(255, 77, 77, 0.4); }
+        }
+        .clock-container.upcoming-alert { animation: alarm-flash 0.8s infinite; border-width: 4px; }
+
         .time-wrapper { display: flex; align-items: baseline; justify-content: center; gap: 10px; }
         #clock { font-family: 'Inter', sans-serif; font-size: 6rem; font-weight: 900; letter-spacing: -2px; line-height: 1; color: var(--text-color); font-variant-numeric: tabular-nums; }
         #ampm { font-family: 'Inter', sans-serif; font-weight: 900; font-size: 3rem; color: var(--text-color); opacity: 0.8; }
-        #status-text { margin-top: 15px; font-size: 0.95rem; font-weight: 700; color: #4479a8; }
+        #status-text { margin-top: 15px; font-size: 0.95rem; font-weight: 700; color: #4479a8; max-width: 80%; }
         
+        #auth-btn { 
+            margin-top: 15px; padding: 10px 24px; border: none; border-radius: 15px; 
+            background: var(--wave-color); color: white; font-weight: 800; 
+            cursor: pointer; transition: all 0.3s ease;
+        }
+
         .info-widget { position: fixed; background: rgba(255, 255, 255, 0.3); backdrop-filter: blur(15px); border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.4); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; width: 120px; height: 120px; top: 50%; }
         .widget-icon { font-size: 3rem; margin-bottom: 5px; }
         .widget-label { font-weight: 800; font-size: 1rem; color: var(--text-color); }
@@ -117,7 +132,7 @@
                 <span id="hour-text">00</span><span id="colon">:</span><span id="min-text">00</span>
             </div>
         </div>
-        <div id="status-text">🌊 파도를 타는 중...</div>
+        <div id="status-text">바다 위 일정을 확인하는 중...</div>
         <button id="auth-btn" style="display:none;" onclick="handleAuthClick()">Google Login</button>
     </div>
 
@@ -128,49 +143,105 @@
         let tokenClient;
         let cachedEvents = [];
 
-        // [수정] 해변 아이콘 랜덤 배치 함수
+        // 해변 아이콘 랜덤 배치
         function spawnBeachItems() {
             const layer = document.getElementById('beach-items-layer');
-            const icons = ['🦀', '🐚', '🐚', '⭐', '🪨', '🪨', '🌿', '🐚', '🦴']; // 해변 아이템 이모지
-            const numItems = 12;
-
-            for (let i = 0; i < numItems; i++) {
+            const icons = ['🦀', '🐚', '⭐', '🪨', '🌿', '🐚', '🐚', '🪨'];
+            for (let i = 0; i < 12; i++) {
                 const item = document.createElement('span');
                 item.className = 'beach-item';
                 item.innerText = icons[Math.floor(Math.random() * icons.length)];
-
-                // 위치 랜덤 (여백 고려)
-                const x = Math.random() * 94 + 3; 
-                const y = Math.random() * 80 + 10;
-                item.style.left = `${x}%`;
-                item.style.top = `${y}%`;
-
-                // 크기 및 각도 랜덤
-                const scale = 0.5 + Math.random() * 1.2;
-                const rotation = Math.random() * 360;
-                item.style.transform = `scale(${scale}) rotate(${rotation}deg)`;
-                
-                // 약간의 투명도 랜덤 (자연스러움)
-                item.style.opacity = 0.7 + Math.random() * 0.3;
-
+                item.style.left = `${Math.random() * 94 + 3}%`;
+                item.style.top = `${Math.random() * 80 + 10}%`;
+                const scale = 0.6 + Math.random() * 1;
+                item.style.transform = `scale(${scale}) rotate(${Math.random() * 360}deg)`;
                 layer.appendChild(item);
             }
         }
 
-        // 기존 기능들 (날씨, 시계 등)
-        async function updateWeather() {
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                const { latitude: lat, longitude: lon } = pos.coords;
-                try {
-                    const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
-                    const wData = await wRes.json();
-                    document.getElementById('weather-temp').innerText = `${Math.round(wData.current_weather.temperature)}°C`;
-                    const icons = { 0: '☀️', 1: '⛅', 2: '⛅', 3: '☁️', 45: '🌫️', 51: '🌧️', 61: '🌧️', 71: '❄️', 95: '⚡' };
-                    document.getElementById('weather-icon').innerText = icons[wData.current_weather.weathercode] || '⛅';
-                } catch (e) { console.error("데이터 로드 실패"); }
+        // 캘린더 핵심 로직 복구
+        function gapiLoaded() { gapi.load('client', async () => { await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'] }); checkInit(); }); }
+        function gisLoaded() { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/calendar.events.readonly', callback: '', }); checkInit(); }
+        
+        function checkInit() { 
+            if (typeof gapi !== 'undefined' && tokenClient) { 
+                const storedToken = localStorage.getItem('gapi_token'); 
+                if (storedToken) { 
+                    const token = JSON.parse(storedToken); gapi.client.setToken(token); 
+                    document.getElementById('auth-btn').style.display = "none"; 
+                    listUpcomingEvents(); 
+                } else { 
+                    document.getElementById('auth-btn').style.display = "block"; 
+                    document.getElementById('status-text').innerText = "모래사장에 일정을 그리려면 로그인이 필요해요 🗓️";
+                } 
+            } 
+        }
+
+        function handleAuthClick() {
+            tokenClient.callback = async (resp) => {
+                if (resp.error !== undefined) throw (resp);
+                localStorage.setItem('gapi_token', JSON.stringify(resp));
+                document.getElementById('auth-btn').style.display = "none";
+                await listUpcomingEvents();
+            };
+            tokenClient.requestAccessToken({prompt: 'select_account'});
+        }
+
+        async function listUpcomingEvents() {
+            try {
+                const token = gapi.client.getToken();
+                if (!token) return;
+                const now = new Date();
+                const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+                const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+                const response = await gapi.client.calendar.events.list({ 'calendarId': 'primary', 'timeMin': startOfDay, 'timeMax': endOfDay, 'showDeleted': false, 'singleEvents': true, 'orderBy': 'startTime' });
+                cachedEvents = response.result.items;
+                renderEventBars(cachedEvents);
+                const upcoming = cachedEvents.find(e => new Date(e.start.dateTime || e.start.date) > now);
+                const statusText = document.getElementById('status-text');
+                if (upcoming) {
+                    const startData = upcoming.start.dateTime || upcoming.start.date;
+                    const startDate = new Date(startData);
+                    const timeStr = upcoming.start.dateTime ? startDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : "All Day";
+                    statusText.innerText = `다음 일정: [${timeStr}] ${upcoming.summary} 🗓️`;
+                } else {
+                    statusText.innerText = cachedEvents.length > 0 ? "오늘의 모든 파도를 넘었습니다 ✨" : "오늘은 일정이 없네요. 휴가인가요? 🏖️";
+                }
+            } catch (err) { if (err.status === 401) refreshAccessToken(); }
+        }
+
+        function renderEventBars(events) {
+            const timeline = document.getElementById('timeline');
+            document.querySelectorAll('.event-bar').forEach(b => b.remove());
+            events.forEach(event => {
+                if (!event.start.dateTime) return;
+                const start = new Date(event.start.dateTime), end = new Date(event.end.dateTime);
+                const sH = start.getHours() + (start.getMinutes() / 60), eH = end.getHours() + (end.getMinutes() / 60);
+                if (eH < START_HOUR || sH > END_HOUR) return;
+                const left = ((Math.max(sH, START_HOUR) - START_HOUR) / (END_HOUR - START_HOUR)) * 100;
+                const width = ((Math.min(eH, END_HOUR) - Math.max(sH, START_HOUR)) / (END_HOUR - START_HOUR)) * 100;
+                const bar = document.createElement('div');
+                bar.className = 'event-bar';
+                bar.style.left = `${left}%`; bar.style.width = `${width}%`;
+                bar.title = event.summary;
+                timeline.appendChild(bar);
             });
         }
 
+        function checkUpcomingAlert(now) {
+            const clockWidget = document.getElementById('clock-widget');
+            let isAlertActive = false;
+            cachedEvents.forEach(event => {
+                if (event.start && event.start.dateTime) {
+                    const diff = (new Date(event.start.dateTime).getTime() - now.getTime()) / (1000 * 60);
+                    if (diff > 0 && diff <= 5) isAlertActive = true;
+                }
+            });
+            if (isAlertActive) clockWidget.classList.add('upcoming-alert');
+            else clockWidget.classList.remove('upcoming-alert');
+        }
+
+        // 시계 및 기타 기능
         function updateClock() {
             const now = new Date();
             const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds(), ms = now.getMilliseconds();
@@ -183,6 +254,20 @@
             const progress = Math.min(Math.max((currentSec - (START_HOUR * 3600)) / ((END_HOUR - START_HOUR) * 3600), 0), 1);
             document.getElementById('wave-wrapper').style.width = `${progress * 100}%`;
             document.getElementById('minute-marker').style.left = `${progress * 100}%`;
+            checkUpcomingAlert(now);
+        }
+
+        async function updateWeather() {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                try {
+                    const { latitude: lat, longitude: lon } = pos.coords;
+                    const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+                    const wData = await wRes.json();
+                    document.getElementById('weather-temp').innerText = `${Math.round(wData.current_weather.temperature)}°C`;
+                    const icons = { 0: '☀️', 1: '⛅', 2: '⛅', 3: '☁️', 45: '🌫️', 51: '🌧️', 61: '🌧️', 71: '❄️', 95: '⚡' };
+                    document.getElementById('weather-icon').innerText = icons[wData.current_weather.weathercode] || '⛅';
+                } catch (e) { console.error("데이터 로드 실패"); }
+            });
         }
 
         function createTimeline() {
@@ -197,6 +282,17 @@
             }
         }
 
+        function refreshAccessToken() {
+            tokenClient.callback = async (resp) => {
+                if (resp.error === undefined) {
+                    localStorage.setItem('gapi_token', JSON.stringify(resp));
+                    gapi.client.setToken(resp);
+                    listUpcomingEvents();
+                }
+            };
+            tokenClient.requestAccessToken({prompt: ''});
+        }
+
         window.addEventListener('mousedown', (e) => {
             const ripple = document.createElement('div');
             ripple.className = 'click-ripple';
@@ -205,12 +301,10 @@
             ripple.addEventListener('animationend', () => ripple.remove());
         });
 
-        spawnBeachItems();
-        createTimeline(); 
-        updateClock(); 
-        updateWeather();
-        setInterval(updateClock, 100); 
-        setInterval(updateWeather, 600000);
+        spawnBeachItems(); createTimeline(); updateClock(); updateWeather();
+        setInterval(updateClock, 100); setInterval(updateWeather, 600000); setInterval(listUpcomingEvents, 300000);
     </script>
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 </body>
 </html>
