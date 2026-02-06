@@ -175,7 +175,6 @@
             });
         }
 
-        // --- 구글 캘린더 초기화 및 인증 ---
         function gapiLoaded() { 
             gapi.load('client', async () => { 
                 await gapi.client.init({ 
@@ -215,15 +214,12 @@
         }
 
         function handleAuthClick() { 
-            // 직접 클릭했을 때만 호출되므로 팝업이 차단되지 않음
             tokenClient.requestAccessToken({prompt: 'select_account'}); 
         }
 
-        // 세션 만료 시 처리
         function refreshAccessToken() {
             console.log("세션 만료 감지");
             localStorage.removeItem('gapi_token');
-            // 팝업을 직접 띄우지 않고, 버튼을 다시 보여주어 사용자 클릭 유도 (팝업 차단 방지)
             document.getElementById('auth-btn').style.display = "block";
             document.getElementById('status-text').innerText = "세션이 만료되었습니다. 다시 로그인해주세요 🔑";
         }
@@ -298,6 +294,13 @@
             const progress = Math.min(Math.max((currentSec - (START_HOUR * 3600)) / ((END_HOUR - START_HOUR) * 3600), 0), 1);
             document.getElementById('wave-wrapper').style.width = `${progress * 100}%`;
             document.getElementById('minute-marker').style.left = `${progress * 100}%`;
+
+            // --- 타임라인 마커 활성화 처리 (Bold & Outline) ---
+            document.querySelectorAll('.time-mark').forEach(mark => {
+                const markHour = parseInt(mark.dataset.hour);
+                if (markHour === h) mark.classList.add('active');
+                else mark.classList.remove('active');
+            });
             
             const clockWidget = document.getElementById('clock-widget');
             let isAlert = false;
@@ -317,6 +320,7 @@
                 const h = START_HOUR + i;
                 const mark = document.createElement('div');
                 mark.className = 'time-mark';
+                mark.dataset.hour = h; // 시간 비교를 위해 데이터 속성 추가
                 mark.style.left = `${(i / (END_HOUR - START_HOUR)) * 100}%`;
                 mark.innerText = h < 12 ? `${h}am` : (h === 12 ? `12pm` : `${h - 12}pm`);
                 timeline.appendChild(mark);
