@@ -23,7 +23,9 @@
                 radial-gradient(circle at 2px 2px, rgba(0,0,0,0.04) 1px, transparent 0),
                 radial-gradient(circle at 5px 10px, rgba(255,255,255,0.2) 1px, transparent 0);
             background-size: 4px 4px, 11px 11px;
-            height: 100vh; width: 100vw; display: flex; justify-content: center; align-items: center; overflow: hidden; 
+            height: 100vh; width: 100vw; display: flex; 
+            flex-direction: column; /* 추가: 시계와 증시 위젯을 세로로 배치 */
+            justify-content: center; align-items: center; overflow: hidden; 
 
             /* --- 텍스트 드래그 및 선택 방지 --- */
             -webkit-user-select: none;
@@ -84,6 +86,19 @@
 
         .click-ripple { position: fixed; width: 20px; height: 20px; background: rgba(255, 255, 255, 0.5); border: 2px solid #ffffff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; animation: rippleAnim 0.6s ease-out forwards; z-index: 99; }
         @keyframes rippleAnim { to { width: 150px; height: 150px; opacity: 0; } }
+
+        /* --- [신규] 증시 지표 위젯 스타일 --- */
+        .market-widget {
+            margin-top: 20px; width: 600px; height: 70px;
+            background: rgba(255, 255, 255, 0.25); backdrop-filter: blur(15px);
+            border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.3);
+            display: flex; justify-content: space-around; align-items: center;
+            padding: 0 10px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05); z-index: 10;
+        }
+        .market-item { display: flex; flex-direction: column; align-items: center; min-width: 100px; }
+        .market-label { font-size: 0.75rem; font-weight: 800; color: var(--text-color); opacity: 0.6; margin-bottom: 2px; }
+        .market-value { font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 800; display: flex; align-items: center; gap: 3px; }
+        .up { color: #eb4d4b; } .down { color: #4834d4; } .stable { color: var(--text-color); }
     </style>
 </head>
 <body>
@@ -120,6 +135,25 @@
         </div>
         <div id="status-text">바다 위 일정을 불러오고 있습니다...</div>
         <button id="auth-btn" style="display:none;" onclick="handleAuthClick()">Google Login</button>
+    </div>
+
+    <div class="market-widget">
+        <div class="market-item">
+            <span class="market-label">KOSPI</span>
+            <span id="kospi-val" class="market-value stable">...</span>
+        </div>
+        <div class="market-item">
+            <span class="market-label">KOSDAQ</span>
+            <span id="kosdaq-val" class="market-value stable">...</span>
+        </div>
+        <div class="market-item">
+            <span class="market-label">NASDAQ</span>
+            <span id="nasdaq-val" class="market-value stable">...</span>
+        </div>
+        <div class="market-item">
+            <span class="market-label">BITCOIN</span>
+            <span id="btc-val" class="market-value stable">...</span>
+        </div>
     </div>
 
     <script>
@@ -175,6 +209,55 @@
             });
         }
 
+        /* --- [신규] 증시 지표 업데이트 로직 --- */
+        async function updateMarketData() {
+            // 1. 비트코인 (Binance API - CORS 이슈 없음)
+            try {
+                const btcRes = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
+                const btcData = await btcRes.json();
+                const btcChange = parseFloat(btcData.priceChangePercent);
+                if (!isNaN(btcChange)) renderMarketItem('btc-val', btcChange);
+            } catch (e) { console.error("BTC 로드 실패"); }
+
+            // 2. 주식 (Yahoo Finance API + Proxy)
+            const symbols = { 'kospi-val': '^KS11', 'kosdaq-val': '^KQ11', 'nasdaq-val': '^IXIC' };
+            for (const [id, symbol] of Object.entries(symbols)) {
+                try {
+                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`)}`;
+                    const res = await fetch(proxyUrl);
+                    const jsonWrapper = await res.json();
+                    const data = JSON.parse(jsonWrapper.contents);
+                    const result = data.chart.result[0];
+                    const meta = result.meta;
+                    
+                    // 가격 추출 보완
+                    let currentPrice = meta.regularMarketPrice;
+                    if (!currentPrice && result.indicators.quote[0].close) {
+                        const validCloses = result.indicators.quote[0].close.filter(c => c !== null);
+                        currentPrice = validCloses[validCloses.length - 1];
+                    }
+                    const prevClose = meta.chartPreviousClose || meta.previousClose;
+
+                    if (currentPrice && prevClose) {
+                        const change = ((currentPrice - prevClose) / prevClose) * 100;
+                        if (!isNaN(change)) renderMarketItem(id, change);
+                    }
+                } catch (e) { 
+                    console.error(`${symbol} 로드 실패`);
+                    document.getElementById(id).innerText = "-";
+                }
+            }
+        }
+
+        function renderMarketItem(id, change) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const formatted = Math.abs(change).toFixed(2) + '%';
+            const icon = change > 0 ? '▲' : (change < 0 ? '▼' : '-');
+            el.innerText = `${icon} ${formatted}`;
+            el.className = 'market-value ' + (change > 0 ? 'up' : (change < 0 ? 'down' : 'stable'));
+        }
+
         function gapiLoaded() { 
             gapi.load('client', async () => { 
                 await gapi.client.init({ 
@@ -228,26 +311,17 @@
             try {
                 const token = gapi.client.getToken(); 
                 if (!token) return;
-
                 const now = new Date();
                 const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
                 const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
-                
                 const response = await gapi.client.calendar.events.list({ 
-                    'calendarId': 'primary', 
-                    'timeMin': startOfDay, 
-                    'timeMax': endOfDay, 
-                    'showDeleted': false, 
-                    'singleEvents': true, 
-                    'orderBy': 'startTime' 
+                    'calendarId': 'primary', 'timeMin': startOfDay, 'timeMax': endOfDay, 
+                    'showDeleted': false, 'singleEvents': true, 'orderBy': 'startTime' 
                 });
-
                 cachedEvents = response.result.items || [];
                 renderEventBars(cachedEvents);
-                
                 const upcoming = cachedEvents.find(e => new Date(e.start.dateTime || e.start.date) > now);
                 const statusText = document.getElementById('status-text');
-                
                 if (upcoming) {
                     const startDate = new Date(upcoming.start.dateTime || upcoming.start.date);
                     const timeStr = upcoming.start.dateTime ? startDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : "하루 종일";
@@ -257,11 +331,7 @@
                 }
             } catch (err) { 
                 console.error("일정 로드 중 에러:", err);
-                if (err.status === 401) {
-                    refreshAccessToken();
-                } else {
-                    document.getElementById('status-text').innerText = "일정을 불러오는 중 오류가 발생했습니다.";
-                }
+                if (err.status === 401) refreshAccessToken();
             }
         }
 
@@ -295,7 +365,6 @@
             document.getElementById('wave-wrapper').style.width = `${progress * 100}%`;
             document.getElementById('minute-marker').style.left = `${progress * 100}%`;
 
-            // --- 타임라인 마커 활성화 처리 (Bold & Outline) ---
             document.querySelectorAll('.time-mark').forEach(mark => {
                 const markHour = parseInt(mark.dataset.hour);
                 if (markHour === h) mark.classList.add('active');
@@ -320,7 +389,7 @@
                 const h = START_HOUR + i;
                 const mark = document.createElement('div');
                 mark.className = 'time-mark';
-                mark.dataset.hour = h; // 시간 비교를 위해 데이터 속성 추가
+                mark.dataset.hour = h;
                 mark.style.left = `${(i / (END_HOUR - START_HOUR)) * 100}%`;
                 mark.innerText = h < 12 ? `${h}am` : (h === 12 ? `12pm` : `${h - 12}pm`);
                 timeline.appendChild(mark);
@@ -335,10 +404,12 @@
             ripple.addEventListener('animationend', () => ripple.remove());
         });
 
-        spawnBeachItems(); createTimeline(); updateClock(); updateWeather();
+        /* --- 초기화 및 주기적 업데이트 호출 --- */
+        spawnBeachItems(); createTimeline(); updateClock(); updateWeather(); updateMarketData();
         setInterval(updateClock, 100); 
         setInterval(updateWeather, 600000); 
         setInterval(listUpcomingEvents, 300000); 
+        setInterval(updateMarketData, 300000); // 5분마다 증시 정보 업데이트
     </script>
     <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
     <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
