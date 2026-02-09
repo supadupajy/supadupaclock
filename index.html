@@ -87,7 +87,7 @@
         .click-ripple { position: fixed; width: 20px; height: 20px; background: rgba(255, 255, 255, 0.5); border: 2px solid #ffffff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; animation: rippleAnim 0.6s ease-out forwards; z-index: 99; }
         @keyframes rippleAnim { to { width: 150px; height: 150px; opacity: 0; } }
 
-        /* --- [신규] 증시 지표 위젯 스타일 --- */
+        /* --- 증시 지표 위젯 스타일 --- */
         .market-widget {
             margin-top: 20px; width: 600px; height: 70px;
             background: rgba(255, 255, 255, 0.25); backdrop-filter: blur(15px);
@@ -209,9 +209,9 @@
             });
         }
 
-        /* --- [신규] 증시 지표 업데이트 로직 --- */
+        /* --- 증시 지표 업데이트 로직 (보완 완료) --- */
         async function updateMarketData() {
-            // 1. 비트코인 (Binance API - CORS 이슈 없음)
+            // 1. 비트코인 (Binance API)
             try {
                 const btcRes = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
                 const btcData = await btcRes.json();
@@ -220,30 +220,42 @@
             } catch (e) { console.error("BTC 로드 실패"); }
 
             // 2. 주식 (Yahoo Finance API + Proxy)
+            // KOSPI, KOSDAQ, NASDAQ 순서대로 조회
             const symbols = { 'kospi-val': '^KS11', 'kosdaq-val': '^KQ11', 'nasdaq-val': '^IXIC' };
             for (const [id, symbol] of Object.entries(symbols)) {
                 try {
-                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`)}`;
+                    // 캐시 방지를 위해 랜덤 쿼리 추가
+                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`)}&nocache=${Date.now()}`;
                     const res = await fetch(proxyUrl);
                     const jsonWrapper = await res.json();
                     const data = JSON.parse(jsonWrapper.contents);
-                    const result = data.chart.result[0];
-                    const meta = result.meta;
+                    const meta = data.chart.result[0].meta;
                     
-                    // 가격 추출 보완
-                    let currentPrice = meta.regularMarketPrice;
-                    if (!currentPrice && result.indicators.quote[0].close) {
-                        const validCloses = result.indicators.quote[0].close.filter(c => c !== null);
-                        currentPrice = validCloses[validCloses.length - 1];
-                    }
-                    const prevClose = meta.chartPreviousClose || meta.previousClose;
+                    let changePercent = null;
 
-                    if (currentPrice && prevClose) {
-                        const change = ((currentPrice - prevClose) / prevClose) * 100;
-                        if (!isNaN(change)) renderMarketItem(id, change);
+                    // 경로 1: API에서 제공하는 실시간 변동률 우선 참조 (가장 정확함)
+                    if (meta.regularMarketChangePercent !== undefined && meta.regularMarketChangePercent !== null) {
+                        changePercent = meta.regularMarketChangePercent;
+                    } 
+                    // 경로 2: 변동률이 없을 경우 수동 계산
+                    else {
+                        let currentPrice = meta.regularMarketPrice;
+                        // regularMarketPrice가 없을 경우 차트의 마지막 종가 데이터 사용
+                        if (!currentPrice && data.chart.result[0].indicators.quote[0].close) {
+                            const validCloses = data.chart.result[0].indicators.quote[0].close.filter(c => c !== null);
+                            currentPrice = validCloses[validCloses.length - 1];
+                        }
+                        const prevClose = meta.previousClose || meta.chartPreviousClose;
+                        if (currentPrice && prevClose) {
+                            changePercent = ((currentPrice - prevClose) / prevClose) * 100;
+                        }
+                    }
+
+                    if (changePercent !== null && !isNaN(changePercent)) {
+                        renderMarketItem(id, changePercent);
                     }
                 } catch (e) { 
-                    console.error(`${symbol} 로드 실패`);
+                    console.error(`${symbol} 로드 실패`, e);
                     document.getElementById(id).innerText = "-";
                 }
             }
@@ -260,9 +272,7 @@
 
         function gapiLoaded() { 
             gapi.load('client', async () => { 
-                await gapi.client.init({ 
-                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'] 
-                }); 
+                await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'] }); 
                 checkInit(); 
             }); 
         }
@@ -296,17 +306,8 @@
             } 
         }
 
-        function handleAuthClick() { 
-            tokenClient.requestAccessToken({prompt: 'select_account'}); 
-        }
+        function handleAuthClick() { tokenClient.requestAccessToken({prompt: 'select_account'}); }
 
-        function refreshAccessToken() {
-            console.log("세션 만료 감지");
-            localStorage.removeItem('gapi_token');
-            document.getElementById('auth-btn').style.display = "block";
-            document.getElementById('status-text').innerText = "세션이 만료되었습니다. 다시 로그인해주세요 🔑";
-        }
-        
         async function listUpcomingEvents() {
             try {
                 const token = gapi.client.getToken(); 
@@ -329,10 +330,7 @@
                 } else {
                     statusText.innerText = cachedEvents.length > 0 ? "오늘의 모든 파도를 넘었습니다 ✨" : "오늘은 일정이 없네요! 🏖️";
                 }
-            } catch (err) { 
-                console.error("일정 로드 중 에러:", err);
-                if (err.status === 401) refreshAccessToken();
-            }
+            } catch (err) { console.error("일정 로드 중 에러:", err); }
         }
 
         function renderEventBars(events) {
@@ -404,12 +402,11 @@
             ripple.addEventListener('animationend', () => ripple.remove());
         });
 
-        /* --- 초기화 및 주기적 업데이트 호출 --- */
         spawnBeachItems(); createTimeline(); updateClock(); updateWeather(); updateMarketData();
         setInterval(updateClock, 100); 
         setInterval(updateWeather, 600000); 
         setInterval(listUpcomingEvents, 300000); 
-        setInterval(updateMarketData, 300000); // 5분마다 증시 정보 업데이트
+        setInterval(updateMarketData, 300000); 
     </script>
     <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
     <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
