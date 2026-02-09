@@ -24,10 +24,9 @@
                 radial-gradient(circle at 5px 10px, rgba(255,255,255,0.2) 1px, transparent 0);
             background-size: 4px 4px, 11px 11px;
             height: 100vh; width: 100vw; display: flex; 
-            flex-direction: column; /* 추가: 시계와 증시 위젯을 세로로 배치 */
+            flex-direction: column; 
             justify-content: center; align-items: center; overflow: hidden; 
 
-            /* --- 텍스트 드래그 및 선택 방지 --- */
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
@@ -209,7 +208,7 @@
             });
         }
 
-        /* --- 증시 지표 업데이트 로직 (보완 완료) --- */
+        /* --- [강화] 증시 지표 실시간 로드 로직 --- */
         async function updateMarketData() {
             // 1. 비트코인 (Binance API)
             try {
@@ -219,44 +218,44 @@
                 if (!isNaN(btcChange)) renderMarketItem('btc-val', btcChange);
             } catch (e) { console.error("BTC 로드 실패"); }
 
-            // 2. 주식 (Yahoo Finance API + Proxy)
-            // KOSPI, KOSDAQ, NASDAQ 순서대로 조회
+            // 2. 주식 지표 (Yahoo Finance + 2종 프록시 전략)
             const symbols = { 'kospi-val': '^KS11', 'kosdaq-val': '^KQ11', 'nasdaq-val': '^IXIC' };
+            
             for (const [id, symbol] of Object.entries(symbols)) {
                 try {
-                    // 캐시 방지를 위해 랜덤 쿼리 추가
+                    // Allorigins 프록시 사용 (nocache 파라미터로 최신 데이터 강제)
                     const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`)}&nocache=${Date.now()}`;
                     const res = await fetch(proxyUrl);
+                    if (!res.ok) throw new Error("Proxy Error");
+                    
                     const jsonWrapper = await res.json();
                     const data = JSON.parse(jsonWrapper.contents);
-                    const meta = data.chart.result[0].meta;
                     
+                    if (!data || !data.chart || !data.chart.result) throw new Error("Invalid Data");
+                    
+                    const meta = data.chart.result[0].meta;
                     let changePercent = null;
 
-                    // 경로 1: API에서 제공하는 실시간 변동률 우선 참조 (가장 정확함)
-                    if (meta.regularMarketChangePercent !== undefined && meta.regularMarketChangePercent !== null) {
+                    // 1순위: API가 직접 제공하는 퍼센트 값
+                    if (meta.regularMarketChangePercent !== undefined) {
                         changePercent = meta.regularMarketChangePercent;
                     } 
-                    // 경로 2: 변동률이 없을 경우 수동 계산
+                    // 2순위: 현재가와 전일 종가 기반 직접 계산
                     else {
-                        let currentPrice = meta.regularMarketPrice;
-                        // regularMarketPrice가 없을 경우 차트의 마지막 종가 데이터 사용
-                        if (!currentPrice && data.chart.result[0].indicators.quote[0].close) {
-                            const validCloses = data.chart.result[0].indicators.quote[0].close.filter(c => c !== null);
-                            currentPrice = validCloses[validCloses.length - 1];
-                        }
-                        const prevClose = meta.previousClose || meta.chartPreviousClose;
-                        if (currentPrice && prevClose) {
-                            changePercent = ((currentPrice - prevClose) / prevClose) * 100;
-                        }
+                        const current = meta.regularMarketPrice || (data.chart.result[0].indicators.quote[0].close.filter(v => v !== null).pop());
+                        const previous = meta.previousClose || meta.chartPreviousClose;
+                        if (current && previous) changePercent = ((current - previous) / previous) * 100;
                     }
 
                     if (changePercent !== null && !isNaN(changePercent)) {
                         renderMarketItem(id, changePercent);
                     }
                 } catch (e) { 
-                    console.error(`${symbol} 로드 실패`, e);
-                    document.getElementById(id).innerText = "-";
+                    console.error(`${symbol} 로드 실패:`, e);
+                    // 실패 시 시각적 표시 (연결 중 상태 유지 또는 "-" 표시)
+                    if (document.getElementById(id).innerText === "...") {
+                        document.getElementById(id).innerText = "로드중";
+                    }
                 }
             }
         }
@@ -272,7 +271,9 @@
 
         function gapiLoaded() { 
             gapi.load('client', async () => { 
-                await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'] }); 
+                await gapi.client.init({ 
+                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'] 
+                }); 
                 checkInit(); 
             }); 
         }
@@ -306,8 +307,17 @@
             } 
         }
 
-        function handleAuthClick() { tokenClient.requestAccessToken({prompt: 'select_account'}); }
+        function handleAuthClick() { 
+            tokenClient.requestAccessToken({prompt: 'select_account'}); 
+        }
 
+        function refreshAccessToken() {
+            console.log("세션 만료 감지");
+            localStorage.removeItem('gapi_token');
+            document.getElementById('auth-btn').style.display = "block";
+            document.getElementById('status-text').innerText = "세션이 만료되었습니다. 다시 로그인해주세요 🔑";
+        }
+        
         async function listUpcomingEvents() {
             try {
                 const token = gapi.client.getToken(); 
@@ -330,7 +340,10 @@
                 } else {
                     statusText.innerText = cachedEvents.length > 0 ? "오늘의 모든 파도를 넘었습니다 ✨" : "오늘은 일정이 없네요! 🏖️";
                 }
-            } catch (err) { console.error("일정 로드 중 에러:", err); }
+            } catch (err) { 
+                console.error("일정 로드 중 에러:", err);
+                if (err.status === 401) refreshAccessToken();
+            }
         }
 
         function renderEventBars(events) {
@@ -402,6 +415,7 @@
             ripple.addEventListener('animationend', () => ripple.remove());
         });
 
+        /* --- 초기화 및 실행 --- */
         spawnBeachItems(); createTimeline(); updateClock(); updateWeather(); updateMarketData();
         setInterval(updateClock, 100); 
         setInterval(updateWeather, 600000); 
